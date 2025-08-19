@@ -206,6 +206,26 @@ export class WPlacer {
         }
     }
 
+    _groupPixelsByTile(pixels, limiter) {
+        const tiles = {};
+        if (!pixels || pixels.length === 0 || limiter <= 0) return tiles;
+
+        let total = 0;
+        for (const p of pixels) {
+            if (p.color === 0) continue;
+            if (total >= limiter) break;
+
+            const key = `${p.tx},${p.ty}`;
+            if (!tiles[key]) tiles[key] = { colors: [], coords: [] };
+
+            tiles[key].colors.push(p.color);
+            tiles[key].coords.push(p.px, p.py);
+
+            total++;
+        }
+        return tiles;
+    }
+
     _getMismatchedPixels() {
         const [startX, startY, startPx, startPy] = this.coords;
         const mismatched = [];
@@ -322,7 +342,9 @@ export class WPlacer {
                     break;
             }
 
-            const bodies = this._placeTemplate(this.coords, this.template, this.currentCharge);
+            // const bodies = this._placeTemplate(this.coords, this.template, this.currentCharge);
+            const bodies = this._groupPixelsByTile(mismatchedPixels, this.currentCharge);
+
 
             let totalPainted = 0;
             let needsRetry = false;
