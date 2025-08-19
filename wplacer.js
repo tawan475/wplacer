@@ -88,7 +88,7 @@ export class WPlacer {
                 throw new Error(`(500) Failed to authenticate: "${userInfo.error}". The cookie is likely invalid or expired.`);
             }
             if (userInfo.id && userInfo.name) {
-                
+
                 // Fix token invalidation from overloading paint calls.
                 this.currentCharge = Math.floor(userInfo.charges.count);
 
@@ -323,10 +323,13 @@ export class WPlacer {
                     break;
             }
 
-            log(this.userInfo.id, this.userInfo.name, `trying to paint ${mismatchedPixels.length} pixels`);
+            log(this.userInfo.id, this.userInfo.name, `There are ${mismatchedPixels.length} mismatched pixels`);
 
             // const bodies = this._placeTemplate(this.coords, this.template, this.currentCharge);
             const bodies = this._groupPixelsByTile(mismatchedPixels, this.currentCharge);
+
+            
+            log(this.userInfo.id, this.userInfo.name, `Trying to paint ${bodies.length} pixels`);
 
 
             let totalPainted = 0;
