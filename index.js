@@ -1,7 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { WPlacer, log, duration } from "./wplacer.js";
-import express from "express";
 import cors from "cors";
+import express from "express";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { WPlacer, duration, log } from "./wplacer.js";
 
 // User data handling
 const users = existsSync("users.json") ? JSON.parse(readFileSync("users.json", "utf8")) : {};
@@ -68,10 +68,13 @@ function requestTokenFromClients(reason = "unknown") {
     sseBroadcast("request-token", { reason });
 }
 
-function logUserError(error, id, name, context) {
+async function logUserError(error, id, name, context) {
     const message = error.message || "An unknown error occurred.";
+    console.trace('Error here!')
     if (message.includes("(500)") || message.includes("(1015)")) {
         log(id, name, `❌ Failed to ${context}: ${message}`);
+        log(id, name, `Waiting 40 seconds for the error to go away`);
+        await new Promise(resolve => setTimeout(resolve, 40000));
     } else {
         log(id, name, `❌ Failed to ${context}`, error);
     }
@@ -154,7 +157,7 @@ class TemplateManager {
                     await this.sleep(currentSettings.purchaseCooldown);
                     await wplacer.loadUserInfo();
                 } catch (error) {
-                    logUserError(error, wplacer.userInfo.id, wplacer.userInfo.name, "purchase max charge upgrades");
+                    await logUserError(error, wplacer.userInfo.id, wplacer.userInfo.name, "purchase max charge upgrades");
                 }
             }
         }
@@ -176,7 +179,7 @@ class TemplateManager {
                         await wplacer.login(users[userId].cookies);
                         return { userId, charges: wplacer.userInfo.charges.count };
                     } catch (error) {
-                        logUserError(error, userId, users[userId].name, "fetch charge state for initial sort");
+                        await logUserError(error, userId, users[userId].name, "fetch charge state for initial sort");
                         return { userId, charges: -1 };
                     } finally {
                         await wplacer.close();
@@ -207,7 +210,7 @@ class TemplateManager {
                             break;
                         }
                     } catch (error) {
-                        logUserError(error, userId, users[userId].name, "perform initial user turn");
+                        await logUserError(error, userId, users[userId].name, "perform initial user turn");
                     } finally {
                         if (wplacer.browser) await wplacer.close();
                         this.activeWplacer = null;
@@ -234,7 +237,7 @@ class TemplateManager {
                 await checkWplacer.login(users[this.masterId].cookies);
                 pixelsRemaining = await checkWplacer.pixelsLeft();
             } catch (error) {
-                logUserError(error, this.masterId, this.masterName, "check pixels left");
+                await logUserError(error, this.masterId, this.masterName, "check pixels left");
                 await this.sleep(DEFAULT_WAIT_TIME_MS);
                 continue;
             } finally {
@@ -264,7 +267,7 @@ class TemplateManager {
                     // store full charges object and cooldown; some accounts may not include cooldownMs directly
                     userStates.push({ userId, charges: wplacer.userInfo.charges, cooldownMs: wplacer.userInfo.charges.cooldownMs });
                 } catch (error) {
-                    logUserError(error, userId, users[userId].name, "check user status");
+                    await logUserError(error, userId, users[userId].name, "check user status");
                 } finally {
                     await wplacer.close();
                 }
@@ -303,7 +306,7 @@ class TemplateManager {
                     this.turnstileToken = wplacer.token;
                     await this.handleUpgrades(wplacer);
                 } catch (error) {
-                    logUserError(error, userToRun.userId, users[userToRun.userId].name, "perform paint turn");
+                    await logUserError(error, userToRun.userId, users[userToRun.userId].name, "perform paint turn");
                 } finally {
                     await wplacer.close();
                     this.activeWplacer = null;
@@ -331,7 +334,7 @@ class TemplateManager {
                             }
                         }
                     } catch(error) {
-                        logUserError(error, this.masterId, this.masterName, "attempt to buy pixel charges");
+                        await logUserError(error, this.masterId, this.masterName, "attempt to buy pixel charges");
                     } finally {
                         await chargeBuyer.close();
                         activeBrowserUsers.delete(this.masterId);
@@ -402,6 +405,9 @@ app.get("/templates", (_, res) => {
     }
     res.json(sanitized);
 });
+app.get('/wplacer.user.js', (_, res) => {
+    res.type("js").sendFile("wplacer.user.js", { root: process.cwd() });
+});
 app.get('/settings', (_, res) => res.json(currentSettings));
 app.put('/settings', (req, res) => {
     const prevSettings = { ...currentSettings };
@@ -429,7 +435,7 @@ app.get("/user/status/:id", async (req, res) => {
         const userInfo = await wplacer.login(users[id].cookies);
         res.status(200).json(userInfo);
     } catch (error) {
-        logUserError(error, id, users[id].name, "validate cookie");
+        await logUserError(error, id, users[id].name, "validate cookie");
         res.status(500).json({ error: error.message });
     } finally {
         await wplacer.close();
@@ -447,7 +453,7 @@ app.post("/user", async (req, res) => {
         saveUsers();
         res.json(userInfo);
     } catch (error) {
-        logUserError(error, 'NEW_USER', 'N/A', 'add new user');
+        await logUserError(error, 'NEW_USER', 'N/A', 'add new user');
         res.status(500).json({ error: error.message });
     } finally {
         if (wplacer.userInfo) activeBrowserUsers.delete(wplacer.userInfo.id);
@@ -470,7 +476,7 @@ app.post("/template", async (req, res) => {
         saveTemplates();
         res.status(200).json({ id: templateId });
     } catch (error) {
-        logUserError(error, req.body.userIds[0], users[req.body.userIds[0]].name, "create template");
+        await logUserError(error, req.body.userIds[0], users[req.body.userIds[0]].name, "create template");
         res.status(500).json({ error: error.message });
     } finally {
         await wplacer.close();
@@ -573,7 +579,7 @@ const keepAlive = async () => {
             await wplacer.login(user.cookies);
             log(userId, user.name, '✅ Cookie keep-alive successful.');
         } catch (error) {
-            logUserError(error, userId, user.name, 'perform keep-alive check');
+            await logUserError(error, userId, user.name, 'perform keep-alive check');
         } finally {
             if (wplacer.browser) await wplacer.close();
             activeBrowserUsers.delete(userId);
