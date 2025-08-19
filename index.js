@@ -453,8 +453,8 @@ app.post("/user", async (req, res) => {
         saveUsers();
         res.json(userInfo);
     } catch (error) {
-        await logUserError(error, 'NEW_USER', 'N/A', 'add new user');
         res.status(500).json({ error: error.message });
+        await logUserError(error, 'NEW_USER', 'N/A', 'add new user');
     } finally {
         if (wplacer.userInfo) activeBrowserUsers.delete(wplacer.userInfo.id);
         await wplacer.close();

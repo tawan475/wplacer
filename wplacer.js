@@ -52,6 +52,7 @@ export class WPlacer {
         this.tokenPromise = new Promise((resolve) => {
             this._resolveToken = resolve;
         });
+        this.currentCharge = 0;
     };
     async login(cookies) {
         this.cookies = cookies;
@@ -70,8 +71,15 @@ export class WPlacer {
         await this.me.waitForSelector('body', { timeout: 15000 });
         const bodyText = await this.me.evaluate(() => document.body.innerText);
 
-        if (bodyText.includes('1015')) {
-            throw new Error("(1015) You are being rate-limited by the server. Please wait a moment and try again.");
+        // Check if body is valid JSON
+        // If it doesnt then something is wrong, throw an error and just dies ¯\_(ツ)_/¯
+        try {
+            JSON.parse(bodyText);
+        } catch {
+            if (bodyText.includes('1015')) {
+                throw new Error("(1015) You are being rate-limited by the server. Please wait a moment and try again.");
+            }
+            throw new Error("Failed to parse server response. The service may be down or returning an invalid format.");
         }
 
         try {
@@ -80,6 +88,10 @@ export class WPlacer {
                 throw new Error(`(500) Failed to authenticate: "${userInfo.error}". The cookie is likely invalid or expired.`);
             }
             if (userInfo.id && userInfo.name) {
+                
+                // Fix token invalidation from overloading paint calls.
+                this.currentCharge = Math.floor(userInfo.charges.count);
+
                 this.userInfo = userInfo;
                 return true;
             } else {
@@ -311,15 +323,17 @@ export class WPlacer {
                     break;
             }
 
+            log(this.userInfo.id, this.userInfo.name, `trying to paint ${mismatchedPixels.length} pixels`);
+
             // const bodies = this._placeTemplate(this.coords, this.template, this.currentCharge);
             const bodies = this._groupPixelsByTile(mismatchedPixels, this.currentCharge);
 
 
             let totalPainted = 0;
             let needsRetry = false;
-            for (const tileKey in bodiesByTile) {
+            for (const tileKey in bodies) {
                 const [tx, ty] = tileKey.split(',').map(Number);
-                const body = { ...bodiesByTile[tileKey], t: this.token };
+                const body = { ...bodies[tileKey], t: this.token };
                 const result = await this._executePaint(tx, ty, body);
 
                 if (result.success) totalPainted += result.painted;
