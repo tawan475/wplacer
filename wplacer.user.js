@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         wplacer
-// @version      1.6.3
+// @version      1.7.0
 // @description  Send token to local server
 // @namespace    https://github.com/luluwaffless/
 // @homepageURL  https://github.com/luluwaffless/wplacer
 // @author       luluwaffless & Jinx & ur-lucky
 // @icon         https://raw.githubusercontent.com/luluwaffless/wplacer/refs/heads/main/public/icons/favicon.png
-// @updateURL    https://raw.githubusercontent.com/luluwaffless/wplacer/refs/heads/main/public/wplacer.user.js
-// @downloadURL  https://raw.githubusercontent.com/luluwaffless/wplacer/refs/heads/main/public/wplacer.user.js
+// @updateURL    http://127.0.0.1:8123/wplacer.user.js
+// @downloadURL  http://127.0.0.1:8123/wplacer.user.js
 // @match        https://wplace.live/*
 // @connect      localhost
 // @connect      127.0.0.1
