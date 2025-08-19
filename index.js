@@ -32,14 +32,14 @@ app.use(express.static("public"));
 app.use(express.json({ limit: Infinity }));
 
 let currentSettings = {
-    turnstileNotifications: false,
+    turnstileNotifications: true,
     accountCooldown: 20000,
     purchaseCooldown: 5000,
     dropletReserve: 0,
     antiGriefStandby: 600000,
     drawingMethod: 'linear',
     chargeThreshold: 0.5,
-    alwaysDrawOnCharge: false
+    alwaysDrawOnCharge: true
 };
 if (existsSync("settings.json")) {
     currentSettings = { ...currentSettings, ...JSON.parse(readFileSync("settings.json", "utf8")) };
@@ -380,7 +380,28 @@ app.get("/events", (req, res) => {
 
 // frontend endpoints
 app.get("/users", (_, res) => res.json(users));
-app.get("/templates", (_, res) => res.json(templates));
+app.get("/templates", (_, res) => {
+    // Return a sanitized version of templates (no circular references)
+    const sanitized = {};
+    for (const id in templates) {
+        const t = templates[id];
+        sanitized[id] = {
+            name: t.name,
+            template: t.template,
+            coords: t.coords,
+            canBuyCharges: t.canBuyCharges,
+            canBuyMaxCharges: t.canBuyMaxCharges,
+            antiGriefMode: t.antiGriefMode,
+            userIds: t.userIds,
+            running: t.running,
+            status: t.status,
+            masterId: t.masterId,
+            masterName: t.masterName,
+            masterIdentifier: t.masterIdentifier
+        };
+    }
+    res.json(sanitized);
+});
 app.get('/settings', (_, res) => res.json(currentSettings));
 app.put('/settings', (req, res) => {
     const prevSettings = { ...currentSettings };
